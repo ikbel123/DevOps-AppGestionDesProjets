@@ -1,0 +1,49 @@
+services:
+  mysqldb:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?Mot de passe MySQL manquant}"
+      MYSQL_DATABASE: devops_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - devops-net
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -uroot -p$${MYSQL_ROOT_PASSWORD} -D devops_db -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  springapp:
+    build: ./backend
+    image: devops-backend:1.0
+    depends_on:
+      mysqldb:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysqldb:3306/devops_db
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: "${MYSQL_ROOT_PASSWORD:?Mot de passe MySQL manquant}"
+    ports:
+      - "8081:8080"
+    networks:
+      - devops-net
+
+  angular:
+    build: ./frontend
+    image: devops-frontend:1.0
+    depends_on:
+      - springapp
+    ports:
+      - "4200:80"
+    networks:
+      - devops-net
+
+networks:
+  devops-net:
+
+volumes:
+  mysql-data:
